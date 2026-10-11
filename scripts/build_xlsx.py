@@ -19,18 +19,31 @@ Input JSON may be either a bare list of question objects, or an object with a
 "filename". Question objects use the NotesLM schema: learningOutcome, topic,
 question, type, taxonomy, choices {A..D}, answer, answerText, timer.
 
+Appending (--append): when the output workbook already exists, its existing
+"Questions" rows are kept and the new questions are added after them (existing
+rows round-trip unchanged, timers included). Questions whose text already exists
+are skipped, so a re-run cannot duplicate. Use --append when a workbook already
+holds questions; the new questions go in the JSON, not the old ones.
+
+Locked file: if Excel has the workbook open, wb.save() raises PermissionError.
+The script then asks that running Excel (via pywin32, if installed) to save and
+close the workbook and retries; otherwise it stops with a clear message.
+
 Usage:
     python build_xlsx.py questions.json
     python build_xlsx.py questions.json -o FM100_PRELIM.xlsx
     python build_xlsx.py questions.json --answer-key
+    python build_xlsx.py new_questions.json -o FM100_PRELIM.xlsx --append --answer-key
 """
 import argparse
 import json
 import math
+import os
 import re
 import sys
+import time
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 HEADERS = ["#", "Learning Outcome", "Topic", "QUESTION", "Type of Question",
@@ -105,6 +118,90 @@ def load(path):
     raise SystemExit("questions JSON must be a list or an object with a 'questions' array")
 
 
+def question_text_key(text):
+    return re.sub(r"\s+", " ", (text or "").strip()).casefold()
+
+
+def read_existing_questions(path):
+    """Read question objects back out of an existing workbook's 'Questions' sheet."""
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if "Questions" not in wb.sheetnames:
+            return []
+        rows = list(wb["Questions"].iter_rows(min_row=2, values_only=True))
+    finally:
+        wb.close()
+    questions = []
+    for row in rows:
+        row = list(row) + [None] * (len(HEADERS) - len(row))
+        if not str(row[3] or "").strip():
+            continue  # blank / spacer row
+        qtype = row[4] or "Multiple Choice"
+        q = {
+            "learningOutcome": row[1] or "",
+            "topic": row[2] or "",
+            "question": row[3] or "",
+            "type": qtype,
+            "taxonomy": row[5] or "Understanding",
+            "choices": {},
+            "answer": "",
+            "answerText": row[11] or "",
+        }
+        if qtype in MCQ_TYPES:
+            for letter, idx in (("A", 6), ("B", 7), ("C", 8), ("D", 9)):
+                if row[idx] not in (None, ""):
+                    q["choices"][letter] = row[idx]
+            q["answer"] = row[10] or ""
+        timer = row[12]
+        if isinstance(timer, (int, float)) and timer > 0:
+            q["timer"] = int(timer)
+        questions.append(q)
+    return questions
+
+
+def release_open_workbook(path):
+    """Ask a running Excel to save+close the workbook at `path`. True on success."""
+    try:
+        import win32com.client  # optional; only needed when Excel holds a lock
+    except ImportError:
+        return False
+    target = os.path.normcase(os.path.abspath(path))
+    try:
+        excel = win32com.client.GetActiveObject("Excel.Application")
+    except Exception:
+        return False
+    try:
+        for wb in list(excel.Workbooks):
+            try:
+                if os.path.normcase(os.path.abspath(wb.FullName)) != target:
+                    continue
+            except Exception:
+                continue
+            excel.DisplayAlerts = False
+            wb.Save()
+            wb.Close(SaveChanges=True)
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def save_workbook(wb, out_path, attempts=3):
+    """Save, releasing an Excel lock (save+close) and retrying if necessary."""
+    for _ in range(attempts):
+        try:
+            wb.save(out_path)
+            return
+        except PermissionError:
+            if not release_open_workbook(out_path):
+                break
+            time.sleep(0.5)
+    raise SystemExit(
+        f"cannot write '{out_path}': it is open in Excel and could not be "
+        "saved and closed automatically. Close the file and re-run."
+    )
+
+
 def build(data, questions, out_path, answer_key=False, force_timer=False):
     wb = Workbook()
     ws = wb.active
@@ -136,7 +233,7 @@ def build(data, questions, out_path, answer_key=False, force_timer=False):
         for col, width in enumerate(KEY_WIDTHS, start=1):
             ks.column_dimensions[ks.cell(row=1, column=col).column_letter].width = width
 
-    wb.save(out_path)
+    save_workbook(wb, out_path)
     return out_path
 
 
@@ -155,6 +252,8 @@ def main():
     ap.add_argument("questions_json")
     ap.add_argument("-o", "--out")
     ap.add_argument("--answer-key", action="store_true", help="add a second 'Answer Key' sheet")
+    ap.add_argument("--append", action="store_true",
+                    help="keep the questions already in the -o workbook and add the new ones after them")
     ap.add_argument("--recompute-timers", action="store_true",
                     help="override any provided timer values with the computed ones")
     args = ap.parse_args()
@@ -163,6 +262,22 @@ def main():
     if not questions:
         raise SystemExit("no questions found in JSON")
     out = args.out or default_name(data)
+
+    if args.append and os.path.exists(out):
+        existing = read_existing_questions(out)
+        seen = {question_text_key(q.get("question")) for q in existing}
+        added = [q for q in questions if question_text_key(q.get("question")) not in seen]
+        skipped = len(questions) - len(added)
+        questions = existing + added
+        print(f"Appending to {out}: kept {len(existing)}, added {len(added)}"
+              + (f", skipped {skipped} duplicate(s)" if skipped else ""),
+              file=sys.stderr)
+    elif os.path.exists(out):
+        n = len(read_existing_questions(out))
+        if n:
+            print(f"warning: {out} already has {n} question(s); they will be "
+                  "overwritten (pass --append to keep them)", file=sys.stderr)
+
     build(data, questions, out, answer_key=args.answer_key, force_timer=args.recompute_timers)
     print(f"Wrote {len(questions)} questions -> {out}", file=sys.stderr)
     return 0

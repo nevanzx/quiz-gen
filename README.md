@@ -23,6 +23,8 @@ flattened to plain text (`PV_due`, `(a) / (b)`).
 
 ```bash
 pip install -r requirements.txt   # python-docx, beautifulsoup4, openpyxl
+# optional: pywin32, only needed to auto save+close a workbook you have open in Excel
+pip install pywin32
 ```
 
 ### Wire into OpenCode
@@ -53,6 +55,9 @@ python scripts/html_text.py lesson.html -o source.txt --outcomes-file outcomes.t
 python scripts/docx_text.py lesson.docx -o source.txt
 #   ... agent writes questions.json (Pass 1), then verifies it (Pass 2) ...
 python scripts/build_xlsx.py questions.json -o "FM100_PRELIM.xlsx" --answer-key
+
+# a workbook already exists and holds questions — keep them, add only the new ones
+python scripts/build_xlsx.py new_questions.json -o "FM100_PRELIM.xlsx" --append --answer-key
 ```
 
 ## Output
@@ -61,6 +66,12 @@ python scripts/build_xlsx.py questions.json -o "FM100_PRELIM.xlsx" --answer-key
 `# · Learning Outcome · Topic · QUESTION · Type of Question · Taxonomy · Choice A–D ·
 Answer · Correct answer in Words · Timer (Seconds)` — identical to the NotesLM
 Quiz editor's Excel export. `--answer-key` adds a readable second sheet.
+
+When the output workbook already exists and holds questions, pass `--append`: its
+existing rows are kept and round-trip unchanged, the new questions are added after
+them, and duplicates (by question text) are skipped — so re-running is safe. If the
+file is open in Excel, `build_xlsx.py` saves and closes it via Excel automation
+(pywin32) and retries before giving up.
 
 Timers are computed by the script (`max(20, ceil(words × 1.5 / 5) × 5)` for
 MC/TF, taxonomy seconds for Identification, step-based for Problem Solving, 900
