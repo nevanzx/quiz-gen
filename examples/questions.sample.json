@@ -1,0 +1,63 @@
+{
+  "subjectCode": "FM100",
+  "description": "Annuities, Perpetuities & Multi-Stage Planning",
+  "examPeriod": "PRELIM",
+  "filename": "FM100_PRELIM.xlsx",
+  "questions": [
+    {
+      "learningOutcome": "Distinguish ordinary annuities, annuities due, and perpetuities from uneven cash-flow streams.",
+      "topic": "Week7-Notebook",
+      "question": "Which type of cash-flow stream consists of equal payments that continue indefinitely with no scheduled end date?",
+      "type": "Multiple Choice",
+      "taxonomy": "Understanding",
+      "choices": {
+        "A": "Ordinary annuity",
+        "B": "Annuity due",
+        "C": "Perpetuity",
+        "D": "Uneven stream"
+      },
+      "answer": "C",
+      "answerText": "Perpetuity"
+    },
+    {
+      "learningOutcome": "Distinguish ordinary annuities, annuities due, and perpetuities from uneven cash-flow streams.",
+      "topic": "Week7-Notebook",
+      "question": "An annuity due with the same payment, rate, and number of periods as an ordinary annuity has a higher present value.",
+      "type": "True/False",
+      "taxonomy": "Understanding",
+      "choices": { "A": "True", "B": "False" },
+      "answer": "A",
+      "answerText": "True"
+    },
+    {
+      "learningOutcome": "Apply annuity formulas to loan amortization and multi-stage planning.",
+      "topic": "Week7-Notebook",
+      "question": "The common date, usually the retirement date, to which all cash flows in a multi-stage problem are collapsed is called the ______.",
+      "type": "Identification",
+      "taxonomy": "Understanding",
+      "choices": {},
+      "answer": "",
+      "answerText": "focal date"
+    },
+    {
+      "learningOutcome": "Compute the present value and future value of ordinary annuities.",
+      "topic": "Week7-Notebook",
+      "question": "A cooperative fund promises to pay ₱3,000 at the end of each year for 5 years. If the required annual return is 8%, what is the present value today of these five payments?",
+      "type": "Problem Solving",
+      "taxonomy": "Applying",
+      "choices": {},
+      "answer": "",
+      "answerText": "Recognize an ordinary annuity with C = 3,000, r = 0.08, n = 5 → factor = (1 - (1.08)^-5) / 0.08 = 3.99271 → PV = 3,000 × 3.99271 = ₱11,978.13"
+    },
+    {
+      "learningOutcome": "Apply annuity formulas to loan amortization and multi-stage planning.",
+      "topic": "Week7-Notebook",
+      "question": "Explain why an annuity due always has a higher present value than an ordinary annuity with the same payment, rate, and number of periods.",
+      "type": "Short Answer",
+      "taxonomy": "Understanding",
+      "choices": {},
+      "answer": "",
+      "answerText": "Each payment of an annuity due arrives one period earlier, so every cash flow earns one extra period of interest. Equivalently, the annuity-due value equals the ordinary-annuity value multiplied by (1 + r), which is greater than 1."
+    }
+  ]
+}
