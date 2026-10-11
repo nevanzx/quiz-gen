@@ -36,6 +36,8 @@ Do not guess these; use the question tool, then confirm a one-line summary.
 ## Workflow
 
 **1. Extract the source text.** Never read `.docx`/HTML as raw bytes; run the script.
+Run every command below from the skill directory (the folder holding this `SKILL.md`),
+or substitute the absolute path to the script.
 
 ```bash
 # HTML lesson notebook — keeps ONLY teaching sections; drops Overview,
