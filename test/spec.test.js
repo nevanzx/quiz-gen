@@ -92,6 +92,25 @@ test("validateSpec checks word-count targets", () => {
   assert.match(validateSpec(spec, { checkFiles: false }).errors.wordCounts, /non-negative/i);
 });
 
+test("normalizeSpec defaults appendToExisting to false", () => {
+  assert.equal(normalizeSpec({}).appendToExisting, false);
+  assert.equal(normalizeSpec({ appendToExisting: true }).appendToExisting, true);
+});
+
+test("validateSpec skips subject/description when appending to an existing workbook", () => {
+  const spec = normalizeSpec({ sources: ["/tmp/lesson.docx"], appendToExisting: true });
+  const { valid, errors } = validateSpec(spec, { checkFiles: false });
+  assert.equal(valid, true);
+  assert.deepEqual(errors, {});
+});
+
+test("buildPrompt reports appending to an existing workbook", () => {
+  const text = buildPrompt(normalizeSpec({
+    sources: ["/tmp/lesson.docx"], appendToExisting: true, output: "BACC100_MIDTERM.xlsx",
+  }));
+  assert.match(text, /- Output: BACC100_MIDTERM\.xlsx \(append to existing workbook\)/);
+});
+
 import { buildPrompt, resolveRoot } from "../plugin/spec.js";
 
 test("resolveRoot prefers override, then session directory over worktree", () => {

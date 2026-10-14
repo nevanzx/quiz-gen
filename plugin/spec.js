@@ -29,6 +29,7 @@ export const DEFAULTS = {
   wordCounts: { stem: 30, choices: 3 },
   output: "",
   append: true,
+  appendToExisting: false,
 };
 
 export function deriveFilename(subjectCode, examPeriod) {
@@ -64,6 +65,7 @@ export function normalizeSpec(raw = {}) {
     },
     output,
     append: raw.append === undefined ? DEFAULTS.append : Boolean(raw.append),
+    appendToExisting: Boolean(raw.appendToExisting),
   };
 }
 
@@ -84,8 +86,10 @@ export function validateSpec(spec, { checkFiles = true } = {}) {
     }
   }
 
-  if (!spec.subjectCode) errors.subjectCode = "Subject code is required.";
-  if (!spec.description) errors.description = "Description is required.";
+  if (!spec.appendToExisting) {
+    if (!spec.subjectCode) errors.subjectCode = "Subject code is required.";
+    if (!spec.description) errors.description = "Description is required.";
+  }
 
   for (const [type, n] of Object.entries(spec.counts)) {
     if (!Number.isInteger(n) || n < 0) {
@@ -127,7 +131,9 @@ export function buildPrompt(spec) {
     `- Difficulty: ${spec.difficulty}`,
     `- Modes: ${modes}`,
     `- Word-count targets: stem ~${spec.wordCounts.stem}, choices/answer ~${spec.wordCounts.choices}`,
-    `- Output: ${spec.output}${spec.append ? " (append if the workbook already has questions)" : " (overwrite)"}`,
+    `- Output: ${spec.output}${spec.appendToExisting
+      ? " (append to existing workbook)"
+      : spec.append ? " (append if the workbook already has questions)" : " (overwrite)"}`,
     "Run the full pipeline: extract the source, generate (Pass 1), verify (Pass 2), export.",
   ].join("\n");
 }

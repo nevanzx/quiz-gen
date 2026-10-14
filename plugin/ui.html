@@ -47,7 +47,7 @@
     <div class="err" data-err="sources"></div>
   </fieldset>
 
-  <fieldset>
+  <fieldset id="courseFieldset">
     <legend>Course</legend>
     <div class="row">
       <label class="field"><span>Subject code</span><input type="text" id="subjectCode" placeholder="FM100" /></label>
@@ -259,13 +259,20 @@ function spec() {
     wordCounts: { stem: Number($("#w-stem").value) || 0, choices: Number($("#w-choices").value) || 0 },
     output: $("#output").value.trim(),
     append: true,
+    appendToExisting: $("#workbookSelect").value !== "",
   };
+}
+
+function updateCourseVisibility() {
+  const appending = $("#workbookSelect").value !== "";
+  $("#courseFieldset").style.display = appending ? "none" : "";
 }
 
 let previewTimer = null;
 function render() {
   document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
   updateAutoOption();
+  updateCourseVisibility();
   clearTimeout(previewTimer);
   previewTimer = setTimeout(updatePreview, 150);
 }
