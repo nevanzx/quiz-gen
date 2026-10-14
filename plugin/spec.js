@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 export const TYPES = [
   "Multiple Choice",
   "True/False",
@@ -63,4 +65,45 @@ export function normalizeSpec(raw = {}) {
     output,
     append: raw.append === undefined ? DEFAULTS.append : Boolean(raw.append),
   };
+}
+
+export function validateSpec(spec, { checkFiles = true } = {}) {
+  const errors = {};
+
+  if (spec.sources.length === 0) {
+    errors.sources = "Add at least one source file.";
+  } else if (checkFiles) {
+    const missing = spec.sources.filter((p) => !existsSync(p));
+    if (missing.length) {
+      errors.sources = `Not found: ${missing.join(", ")}`;
+    } else {
+      const wrongExt = spec.sources.filter((p) => !/\.(docx|html?)$/i.test(p));
+      if (wrongExt.length) {
+        errors.sources = `Must be .docx or .html: ${wrongExt.join(", ")}`;
+      }
+    }
+  }
+
+  if (!spec.subjectCode) errors.subjectCode = "Subject code is required.";
+  if (!spec.description) errors.description = "Description is required.";
+
+  for (const [type, n] of Object.entries(spec.counts)) {
+    if (!Number.isInteger(n) || n < 0) {
+      errors.counts = `Count for ${type} must be a non-negative integer.`;
+      break;
+    }
+  }
+  if (!errors.counts) {
+    const total = Object.values(spec.counts).reduce((a, b) => a + b, 0);
+    if (total <= 0) errors.counts = "Total questions must be at least 1.";
+  }
+
+  const { stem, choices } = spec.wordCounts;
+  if (!Number.isInteger(stem) || stem < 0) {
+    errors.wordCounts = "Stem words must be a non-negative integer.";
+  } else if (!Number.isInteger(choices) || choices < 0) {
+    errors.wordCounts = "Choice/answer words must be a non-negative integer.";
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors };
 }
