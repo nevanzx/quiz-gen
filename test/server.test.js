@@ -100,14 +100,18 @@ test("submit returns 400 with field errors on invalid spec", async () => {
 
 test("list returns folders and docx/html files but not other files", async () => {
   const root = await makeRoot();
+  await writeFile(path.join(root, "page.htm"), "x");
+  await writeFile(path.join(root, "page.html"), "x");
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
   const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}&token=${server.token}`);
   assert.equal(res.status, 200);
   const { entries } = await res.json();
   const names = entries.map((e) => e.name);
   assert.ok(names.includes("lesson.docx"));
+  assert.ok(names.includes("page.html"));
   assert.ok(names.includes("Week 7"));
   assert.ok(!names.includes("notes.txt"));
+  assert.ok(!names.includes("page.htm"));
   server.close();
 });
 
@@ -153,5 +157,16 @@ test("list allows a child whose name begins with dots", async () => {
     `${server.url}/api/list?dir=${encodeURIComponent(path.join(root, "..foo"))}&token=${server.token}`
   );
   assert.equal(res.status, 200);
+  server.close();
+});
+
+test("server closes itself after the idle timeout", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({
+    root, formHtml: "", inject: async () => {}, idleTimeoutMs: 100,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  await assert.rejects(fetch(`${server.url}/api/config?token=${server.token}`));
+  server.close();
   server.close();
 });

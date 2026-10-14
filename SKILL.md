@@ -29,6 +29,8 @@ difficulty, modes, word-count targets, output). The user fills it in and clicks 
 the spec is then typed into the OpenCode prompt and arrives as the next message — treat
 that message as the confirmed spec and proceed with the workflow below.
 
+If the incoming user message already begins with `Generate a quiz using the quiz-gen skill with these settings:`, the spec has already been collected — skip the UI and proceed with the workflow below.
+
 Do not also ask the same questions in chat. If (and only if) the `quiz_ui` tool is not
 available, fall back to collecting the inputs with the question tool as described in
 `## Inputs`.

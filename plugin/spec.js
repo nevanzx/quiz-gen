@@ -77,7 +77,7 @@ export function validateSpec(spec, { checkFiles = true } = {}) {
     if (missing.length) {
       errors.sources = `Not found: ${missing.join(", ")}`;
     } else {
-      const wrongExt = spec.sources.filter((p) => !/\.(docx|html?)$/i.test(p));
+      const wrongExt = spec.sources.filter((p) => !/\.(docx|html)$/i.test(p));
       if (wrongExt.length) {
         errors.sources = `Must be .docx or .html: ${wrongExt.join(", ")}`;
       }

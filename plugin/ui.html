@@ -213,19 +213,28 @@ $("#up").addEventListener("click", () => {
 });
 
 async function submit() {
+  $("#generate").disabled = true;
   $("#status").textContent = "Sending…";
   $("#status2").textContent = "";
-  const res = await fetch("/api/submit", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(spec()),
-  });
+  let res;
+  try {
+    res = await fetch("/api/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(spec()),
+    });
+  } catch {
+    $("#generate").disabled = false;
+    $("#status").textContent = "Could not reach the spec server.";
+    return;
+  }
   const body = await res.json().catch(() => ({}));
   if (res.ok) {
     $("#status").textContent = "Sent to OpenCode — check the TUI.";
     $("#generate").disabled = true;
     return;
   }
+  $("#generate").disabled = false;
   document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
   const errs = body.errors || {};
   for (const [k, v] of Object.entries(errs)) {

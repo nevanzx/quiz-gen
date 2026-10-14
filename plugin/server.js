@@ -51,17 +51,21 @@ async function resolveWithinRoot(root, dir) {
   return target;
 }
 
-export async function createSpecServer({ root, formHtml, inject, checkFiles = true }) {
+export async function createSpecServer({ root, formHtml, inject, checkFiles = true, idleTimeoutMs = 900000 }) {
   const token = randomBytes(16).toString("hex");
 
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, "http://127.0.0.1");
-    const cookieAuthed = (req.headers.cookie || "")
-      .split(";")
-      .some((c) => c.trim() === `quizui_token=${token}`);
-    const authed = url.searchParams.get("token") === token || cookieAuthed;
+    resetIdleTimer();
+    let url;
+    let cookieAuthed;
+    let authed;
 
     try {
+      url = new URL(req.url, "http://127.0.0.1");
+      cookieAuthed = (req.headers.cookie || "")
+        .split(";")
+        .some((c) => c.trim() === `quizui_token=${token}`);
+      authed = url.searchParams.get("token") === token || cookieAuthed;
       if (req.method === "GET" && url.pathname === "/") {
         if (url.searchParams.get("token") !== token) return send(res, 403, { error: "forbidden" });
         return send(res, 200, formHtml, {
@@ -85,7 +89,7 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
           return send(res, 400, { errors: { _: "Cannot read that directory." } });
         }
         const entries = dirents
-          .filter((e) => e.isDirectory() || (e.isFile() && /\.(docx|html?)$/i.test(e.name)))
+          .filter((e) => e.isDirectory() || (e.isFile() && /\.(docx|html)$/i.test(e.name)))
           .map((e) => ({
             name: e.name,
             kind: e.isDirectory() ? "dir" : "file",
@@ -135,10 +139,35 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address();
+
+  let closed = false;
+  let idleTimer = null;
+  function clearIdleTimer() {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  }
+  function resetIdleTimer() {
+    clearIdleTimer();
+    if (closed || !(idleTimeoutMs > 0)) return;
+    idleTimer = setTimeout(() => {
+      closeServer();
+    }, idleTimeoutMs);
+    if (typeof idleTimer.unref === "function") idleTimer.unref();
+  }
+  function closeServer() {
+    if (closed) return;
+    closed = true;
+    clearIdleTimer();
+    server.close();
+  }
+
+  resetIdleTimer();
   return {
     url: `http://127.0.0.1:${port}`,
     port,
     token,
-    close: () => server.close(),
+    close: () => closeServer(),
   };
 }
