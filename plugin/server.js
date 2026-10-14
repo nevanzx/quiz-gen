@@ -1,5 +1,7 @@
 import http from "node:http";
 import { randomBytes } from "node:crypto";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import { normalizeSpec, validateSpec, buildPrompt } from "./spec.js";
 
 const MAX_BODY = 1_000_000;
@@ -31,6 +33,14 @@ function readBody(req) {
   });
 }
 
+function resolveWithinRoot(root, dir) {
+  const resolvedRoot = path.resolve(root);
+  const target = path.resolve(dir || resolvedRoot);
+  const rel = path.relative(resolvedRoot, target);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return target;
+}
+
 export async function createSpecServer({ root, formHtml, inject, checkFiles = true }) {
   const token = randomBytes(16).toString("hex");
 
@@ -52,6 +62,29 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
       if (req.method === "GET" && url.pathname === "/api/config") {
         if (!authed) return send(res, 403, { error: "forbidden" });
         return send(res, 200, { root });
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/list") {
+        if (!authed) return send(res, 403, { error: "forbidden" });
+        const target = resolveWithinRoot(root, url.searchParams.get("dir"));
+        if (!target) return send(res, 403, { error: "forbidden" });
+        let dirents;
+        try {
+          dirents = await readdir(target, { withFileTypes: true });
+        } catch {
+          return send(res, 400, { errors: { _: "Cannot read that directory." } });
+        }
+        const entries = dirents
+          .filter((e) => e.isDirectory() || (e.isFile() && /\.(docx|html?)$/i.test(e.name)))
+          .map((e) => ({
+            name: e.name,
+            kind: e.isDirectory() ? "dir" : "file",
+            path: path.join(target, e.name),
+          }))
+          .sort((a, b) =>
+            a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "dir" ? -1 : 1
+          );
+        return send(res, 200, { entries });
       }
 
       if (req.method === "POST" && url.pathname === "/api/preview") {

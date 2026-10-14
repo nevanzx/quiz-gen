@@ -97,3 +97,33 @@ test("submit returns 400 with field errors on invalid spec", async () => {
   assert.ok(body.errors.subjectCode);
   server.close();
 });
+
+test("list returns folders and docx/html files but not other files", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}&token=${server.token}`);
+  assert.equal(res.status, 200);
+  const { entries } = await res.json();
+  const names = entries.map((e) => e.name);
+  assert.ok(names.includes("lesson.docx"));
+  assert.ok(names.includes("Week 7"));
+  assert.ok(!names.includes("notes.txt"));
+  server.close();
+});
+
+test("list rejects directories outside the root", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const outside = path.dirname(root);
+  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(outside)}&token=${server.token}`);
+  assert.equal(res.status, 403);
+  server.close();
+});
+
+test("list requires the token", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}`);
+  assert.equal(res.status, 403);
+  server.close();
+});
