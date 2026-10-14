@@ -1,0 +1,8 @@
+{
+  "name": "quiz-gen",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
