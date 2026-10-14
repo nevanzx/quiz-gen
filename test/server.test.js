@@ -98,41 +98,48 @@ test("submit returns 400 with field errors on invalid spec", async () => {
   server.close();
 });
 
-test("list returns folders and docx/html files but not other files", async () => {
+test("scan finds nested sources and workbooks recursively", async () => {
   const root = await makeRoot();
-  await writeFile(path.join(root, "page.htm"), "x");
-  await writeFile(path.join(root, "page.html"), "x");
+  await mkdir(path.join(root, "Week 7"), { recursive: true });
+  await writeFile(path.join(root, "Week 7", "lesson7.html"), "x");
+  await writeFile(path.join(root, "FM100_PRELIM.xlsx"), "x");
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}&token=${server.token}`);
+  const res = await fetch(`${server.url}/api/scan?token=${server.token}`);
   assert.equal(res.status, 200);
-  const { entries } = await res.json();
-  const names = entries.map((e) => e.name);
-  assert.ok(names.includes("lesson.docx"));
-  assert.ok(names.includes("page.html"));
-  assert.ok(names.includes("Week 7"));
-  assert.ok(!names.includes("notes.txt"));
-  assert.ok(!names.includes("page.htm"));
+  const { sources, workbooks } = await res.json();
+  const rels = sources.map((s) => s.rel);
+  assert.ok(rels.includes("lesson.docx"));
+  assert.ok(rels.includes("Week 7/lesson7.html"));
+  assert.ok(!rels.some((r) => r.endsWith(".txt")));
+  assert.ok(sources.every((s) => typeof s.name === "string" && typeof s.path === "string"));
+  assert.ok(workbooks.some((w) => w.name === "FM100_PRELIM.xlsx"));
   server.close();
 });
 
-test("list rejects directories outside the root", async () => {
+test("scan skips node_modules, .git and dot-directories", async () => {
+  const root = await makeRoot();
+  for (const dir of ["node_modules", ".git", ".cache"]) {
+    await mkdir(path.join(root, dir));
+    await writeFile(path.join(root, dir, "hidden.html"), "x");
+  }
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const { sources } = await (await fetch(`${server.url}/api/scan?token=${server.token}`)).json();
+  const rels = sources.map((s) => s.rel);
+  assert.ok(!rels.some((r) => r.startsWith("node_modules/")));
+  assert.ok(!rels.some((r) => r.startsWith(".git/")));
+  assert.ok(!rels.some((r) => r.startsWith(".cache/")));
+  server.close();
+});
+
+test("scan requires the token", async () => {
   const root = await makeRoot();
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const outside = path.dirname(root);
-  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(outside)}&token=${server.token}`);
+  const res = await fetch(`${server.url}/api/scan`);
   assert.equal(res.status, 403);
   server.close();
 });
 
-test("list requires the token", async () => {
-  const root = await makeRoot();
-  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}`);
-  assert.equal(res.status, 403);
-  server.close();
-});
-
-test("list rejects a symlink that escapes the root", async (t) => {
+test("scan does not follow a symlink that escapes the root", async (t) => {
   const root = await makeRoot();
   const outside = await mkdtemp(path.join(tmpdir(), "quizui-outside-"));
   await writeFile(path.join(outside, "secret.docx"), "x");
@@ -144,19 +151,8 @@ test("list rejects a symlink that escapes the root", async (t) => {
     return;
   }
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(link)}&token=${server.token}`);
-  assert.equal(res.status, 403);
-  server.close();
-});
-
-test("list allows a child whose name begins with dots", async () => {
-  const root = await makeRoot();
-  await mkdir(path.join(root, "..foo"));
-  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const res = await fetch(
-    `${server.url}/api/list?dir=${encodeURIComponent(path.join(root, "..foo"))}&token=${server.token}`
-  );
-  assert.equal(res.status, 200);
+  const { sources } = await (await fetch(`${server.url}/api/scan?token=${server.token}`)).json();
+  assert.ok(!sources.some((s) => s.name === "secret.docx"));
   server.close();
 });
 

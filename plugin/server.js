@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomBytes } from "node:crypto";
-import { readdir, realpath } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { normalizeSpec, validateSpec, buildPrompt } from "./spec.js";
 
@@ -51,6 +51,68 @@ async function resolveWithinRoot(root, dir) {
   return target;
 }
 
+const SKIP_DIRS = new Set(["node_modules", ".git"]);
+const SOURCE_RE = /\.(docx|html)$/i;
+const XLSX_RE = /\.xlsx$/i;
+
+async function scanSources(root) {
+  const rootAbs = path.resolve(root);
+  const sources = [];
+  const workbooks = [];
+  const seen = new Set();
+
+  function addEntry(dir, name) {
+    const abs = path.resolve(dir, name);
+    const rel = path.relative(rootAbs, abs).split(path.sep).join("/");
+    if (SOURCE_RE.test(name)) sources.push({ name, rel, path: abs });
+    else if (XLSX_RE.test(name)) workbooks.push({ name, rel, path: abs });
+  }
+
+  async function walk(dir) {
+    let real;
+    try {
+      real = await realpath(dir);
+    } catch {
+      return;
+    }
+    if (seen.has(real)) return;
+    seen.add(real);
+    let dirents;
+    try {
+      dirents = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of dirents) {
+      const full = path.join(dir, e.name);
+      let isDir = e.isDirectory();
+      let isFile = e.isFile();
+      if (e.isSymbolicLink()) {
+        try {
+          const st = await stat(full);
+          isDir = st.isDirectory();
+          isFile = st.isFile();
+        } catch {
+          continue;
+        }
+      }
+      if (isDir) {
+        if (e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
+        if (!(await resolveWithinRoot(root, full))) continue;
+        await walk(full);
+      } else if (isFile) {
+        if (!(await resolveWithinRoot(root, full))) continue;
+        addEntry(dir, e.name);
+      }
+    }
+  }
+
+  await walk(root);
+  sources.sort((a, b) => a.rel.localeCompare(b.rel));
+  workbooks.sort((a, b) => a.rel.localeCompare(b.rel));
+  return { sources, workbooks };
+}
+
 export async function createSpecServer({ root, formHtml, inject, checkFiles = true, idleTimeoutMs = 900000 }) {
   const token = randomBytes(16).toString("hex");
 
@@ -78,27 +140,14 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
         return send(res, 200, { root });
       }
 
-      if (req.method === "GET" && url.pathname === "/api/list") {
+      if (req.method === "GET" && url.pathname === "/api/scan") {
         if (!authed) return send(res, 403, { error: "forbidden" });
-        const target = await resolveWithinRoot(root, url.searchParams.get("dir"));
-        if (!target) return send(res, 403, { error: "forbidden" });
-        let dirents;
         try {
-          dirents = await readdir(target, { withFileTypes: true });
+          await readdir(root);
         } catch {
-          return send(res, 400, { errors: { _: "Cannot read that directory." } });
+          return send(res, 400, { errors: { _: "Cannot read the working directory." } });
         }
-        const entries = dirents
-          .filter((e) => e.isDirectory() || (e.isFile() && /\.(docx|html)$/i.test(e.name)))
-          .map((e) => ({
-            name: e.name,
-            kind: e.isDirectory() ? "dir" : "file",
-            path: path.join(target, e.name),
-          }))
-          .sort((a, b) =>
-            a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "dir" ? -1 : 1
-          );
-        return send(res, 200, { entries });
+        return send(res, 200, await scanSources(root));
       }
 
       if (req.method === "POST" && url.pathname === "/api/preview") {
