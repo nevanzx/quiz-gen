@@ -21,7 +21,19 @@ Two passes, in this order:
 - Keywords: quiz, exam, test paper, MCQ, identification, true/false, problem solving, answer key, Excel.
 - When NOT to use: writing lesson content, slides, or activities.
 
-## Inputs — ask first (question tool)
+## Step 0 — Launch the spec UI (default)
+
+If the `quiz_ui` tool is available, call it **first**, before anything else. It opens a
+browser form that collects every input below (source, subject, exam period, counts,
+difficulty, modes, word-count targets, output). The user fills it in and clicks Generate;
+the spec is then typed into the OpenCode prompt and arrives as the next message — treat
+that message as the confirmed spec and proceed with the workflow below.
+
+Do not also ask the same questions in chat. If (and only if) the `quiz_ui` tool is not
+available, fall back to collecting the inputs with the question tool as described in
+`## Inputs`.
+
+## Inputs (fallback when the UI is unavailable)
 
 Do not guess these; use the question tool, then confirm a one-line summary.
 

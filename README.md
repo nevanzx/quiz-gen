@@ -44,6 +44,21 @@ ln -s /path/to/quiz-gen ~/.claude/skills/quiz-gen
 New-Item -ItemType Junction -Path "$HOME\.claude\skills\quiz-gen" -Target "D:\Python\quiz-gen"
 ```
 
+### Optional: spec UI plugin
+
+The quiz-gen companion plugin adds a browser form for collecting quiz specs. It opens
+automatically whenever the skill runs.
+
+```powershell
+powershell -File scripts/install-plugin.ps1
+# macOS/Linux: cp plugin/* ~/.config/opencode/plugins/
+```
+
+Restart OpenCode after installing. The plugin registers a `quiz_ui` tool; when the skill
+is used, the agent calls it, the form opens at `http://127.0.0.1:<random-port>`, and on
+submit the spec is typed into the OpenCode prompt to start the pipeline. The server is
+loopback-only and token-guarded.
+
 ## Use
 
 Once installed, just ask in OpenCode, e.g. *"Generate a Week 7 exam quiz from
