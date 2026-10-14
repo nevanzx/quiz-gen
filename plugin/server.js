@@ -51,7 +51,21 @@ async function resolveWithinRoot(root, dir) {
   return target;
 }
 
-const SKIP_DIRS = new Set(["node_modules", ".git"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "out",
+  "venv",
+  ".venv",
+  "__pycache__",
+  "target",
+  "vendor",
+  "coverage",
+  "bin",
+  "obj",
+]);
 const SOURCE_RE = /\.(docx|html)$/i;
 const XLSX_RE = /\.xlsx$/i;
 
@@ -97,7 +111,7 @@ async function scanSources(root) {
         }
       }
       if (isDir) {
-        if (e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
+        if (e.name.startsWith(".") || SKIP_DIRS.has(e.name.toLowerCase())) continue;
         if (!(await resolveWithinRoot(root, full))) continue;
         await walk(full);
       } else if (isFile) {

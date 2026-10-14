@@ -17,8 +17,6 @@
   input[type=text], input[type=number] { padding: .35rem .5rem; }
   input[type=text] { min-width: 22ch; }
   input[type=number] { width: 5.5ch; }
-  .src { display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
-  .src input { flex: 1; }
   .chk { display: flex; align-items: center; gap: .35rem; padding: .1rem 0; }
   .group { font-weight: 600; margin-top: .5rem; opacity: .8; }
   .hint { font-size: .85rem; opacity: .7; }
@@ -29,10 +27,6 @@
   button { padding: .5rem .9rem; border-radius: 8px; cursor: pointer; }
   #generate { font-weight: 600; }
   #status { margin-left: .75rem; }
-  dialog { border: 1px solid #8884; border-radius: 8px; max-width: 90vw; }
-  dialog ul { list-style: none; padding: 0; max-height: 50vh; overflow: auto; }
-  dialog li { padding: .25rem .1rem; }
-  dialog button.link { background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 </style>
 </head>
 <body>
@@ -171,8 +165,10 @@ async function loadSources() {
     if (!res.ok) throw new Error("scan failed");
     data = await res.json();
   } catch {
+    scan = { sources: [], workbooks: [] };
     $("#sources").innerHTML = "";
     $("#sourcesHint").textContent = "Could not scan the working directory.";
+    renderWorkbookNotice();
     return;
   }
   scan = { sources: data.sources || [], workbooks: data.workbooks || [] };

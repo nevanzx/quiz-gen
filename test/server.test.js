@@ -122,12 +122,16 @@ test("scan skips node_modules, .git and dot-directories", async () => {
     await mkdir(path.join(root, dir));
     await writeFile(path.join(root, dir, "hidden.html"), "x");
   }
+  await writeFile(path.join(root, "node_modules", "hidden.xlsx"), "x");
+  await writeFile(path.join(root, "page.htm"), "x");
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
-  const { sources } = await (await fetch(`${server.url}/api/scan?token=${server.token}`)).json();
+  const { sources, workbooks } = await (await fetch(`${server.url}/api/scan?token=${server.token}`)).json();
   const rels = sources.map((s) => s.rel);
   assert.ok(!rels.some((r) => r.startsWith("node_modules/")));
   assert.ok(!rels.some((r) => r.startsWith(".git/")));
   assert.ok(!rels.some((r) => r.startsWith(".cache/")));
+  assert.ok(!workbooks.some((w) => w.rel.startsWith("node_modules/")));
+  assert.ok(!rels.includes("page.htm"));
   server.close();
 });
 
