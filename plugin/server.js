@@ -76,6 +76,7 @@ async function scanSources(root) {
   const seen = new Set();
 
   function addEntry(dir, name) {
+    if (name.startsWith("~$")) return;
     const abs = path.resolve(dir, name);
     const rel = path.relative(rootAbs, abs).split(path.sep).join("/");
     if (SOURCE_RE.test(name)) sources.push({ name, rel, path: abs });

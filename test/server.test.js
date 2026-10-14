@@ -166,6 +166,19 @@ test("scan with dir still requires the token", async () => {
   server.close();
 });
 
+test("scan skips Office temp files (~$)", async () => {
+  const root = await makeRoot();
+  await writeFile(path.join(root, "~$lesson.docx"), "x");
+  await writeFile(path.join(root, "~$book.xlsx"), "x");
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const { sources, workbooks } = await (
+    await fetch(`${server.url}/api/scan?token=${server.token}`)
+  ).json();
+  assert.ok(!sources.some((s) => s.name.startsWith("~$")));
+  assert.ok(!workbooks.some((w) => w.name.startsWith("~$")));
+  server.close();
+});
+
 test("scan requires the token", async () => {
   const root = await makeRoot();
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });

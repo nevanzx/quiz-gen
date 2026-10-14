@@ -15,6 +15,7 @@
   .field { display: flex; flex-direction: column; }
   .field > span { font-size: .8rem; opacity: .75; }
   input[type=text], input[type=number] { padding: .35rem .5rem; }
+  select { padding: .35rem .5rem; }
   input[type=text] { min-width: 22ch; }
   input[type=number] { width: 5.5ch; }
   .chk { display: flex; align-items: center; gap: .35rem; padding: .1rem 0; }
@@ -60,7 +61,6 @@
       <label><input type="radio" name="period" value="MIDTERM" /> MIDTERM</label>
       <label><input type="radio" name="period" value="FINALS" /> FINALS</label>
     </div>
-    <p class="notice" id="workbookNotice"></p>
   </fieldset>
 
   <fieldset>
@@ -92,6 +92,18 @@
     <div class="row">
       <label class="field"><span>Stem words</span><input type="number" id="w-stem" value="30" min="0" /></label>
       <label class="field"><span>Choice/answer words</span><input type="number" id="w-choices" value="3" min="0" /></label>
+    </div>
+    <div class="row">
+      <label class="field" style="flex:1">
+        <span>Append to existing workbook</span>
+        <select id="workbookSelect"><option value="">New workbook</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="field" style="flex:1">
+        <span>Workbook folder (optional)</span>
+        <input type="text" id="workbookDir" placeholder="default: the lesson folder" style="min-width:100%" />
+      </label>
     </div>
     <div class="row">
       <label class="field"><span>Output file</span><input type="text" id="output" placeholder="auto" /></label>
@@ -177,7 +189,7 @@ async function loadSources() {
     scan = { sources: [], workbooks: [] };
     $("#sources").innerHTML = "";
     $("#sourcesHint").textContent = `Could not scan: ${err.message}`;
-    renderWorkbookNotice();
+    renderWorkbookSelect();
     return;
   }
   if (data.root) {
@@ -185,25 +197,50 @@ async function loadSources() {
     $("#scanDir").value = data.root;
   }
   scan = { sources: data.sources || [], workbooks: data.workbooks || [] };
+  const wdir = $("#workbookDir").value.trim();
+  if (wdir && wdir !== root) {
+    try {
+      const wres = await fetch(`/api/scan?dir=${encodeURIComponent(wdir)}`);
+      const wbody = await wres.json().catch(() => ({}));
+      scan.workbooks = wres.ok ? wbody.workbooks || [] : [];
+    } catch {
+      scan.workbooks = [];
+    }
+  }
   renderSources();
-  renderWorkbookNotice();
+  renderWorkbookSelect();
 }
 
-function effectiveOutput() {
-  const o = $("#output").value.trim();
-  if (o) return o.toLowerCase().endsWith(".xlsx") ? o : o + ".xlsx";
+function derivedName() {
   const code = $("#subjectCode").value.trim();
   const period = document.querySelector("input[name=period]:checked").value;
   const name = [code, period].filter(Boolean).join("_");
   return name ? name + ".xlsx" : "";
 }
 
-function renderWorkbookNotice() {
-  const el = $("#workbookNotice");
-  const out = effectiveOutput();
-  const base = out.replace(/\\/g, "/").split("/").pop().toLowerCase();
-  const hit = base && (scan.workbooks || []).find((w) => w.name.toLowerCase() === base);
-  el.textContent = hit ? `Found ${hit.name} — new questions will be appended.` : "";
+function updateAutoOption() {
+  const auto = $("#workbookSelect").querySelector('option[value=""]');
+  if (!auto) return;
+  const d = derivedName();
+  auto.textContent = d ? `New workbook — ${d}` : "New workbook";
+}
+
+function renderWorkbookSelect() {
+  const sel = $("#workbookSelect");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const auto = document.createElement("option");
+  auto.value = "";
+  const d = derivedName();
+  auto.textContent = d ? `New workbook — ${d}` : "New workbook";
+  sel.append(auto);
+  for (const w of scan.workbooks || []) {
+    const o = document.createElement("option");
+    o.value = w.path;
+    o.textContent = w.rel;
+    sel.append(o);
+  }
+  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
 }
 
 function spec() {
@@ -228,7 +265,7 @@ function spec() {
 let previewTimer = null;
 function render() {
   document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
-  renderWorkbookNotice();
+  updateAutoOption();
   clearTimeout(previewTimer);
   previewTimer = setTimeout(updatePreview, 150);
 }
@@ -278,6 +315,11 @@ async function submit() {
 }
 
 $("#refreshSources").addEventListener("click", loadSources);
+$("#workbookDir").addEventListener("change", loadSources);
+$("#workbookSelect").addEventListener("change", () => {
+  $("#output").value = $("#workbookSelect").value;
+  render();
+});
 document.body.addEventListener("input", render);
 document.body.addEventListener("change", render);
 $("#generate").addEventListener("click", submit);
