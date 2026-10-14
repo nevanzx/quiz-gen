@@ -23,7 +23,7 @@ export const QuizUiPlugin = async ({ client, directory, worktree }) => {
           "the spec is then typed into the OpenCode prompt and the quiz pipeline starts.",
         args: {},
         async execute() {
-          if (!server) {
+          if (!server || server.closed) {
             const formHtml = await readFile(new URL("./ui.html", import.meta.url), "utf8");
             server = await createSpecServer({
               root,

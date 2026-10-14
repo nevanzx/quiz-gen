@@ -168,6 +168,7 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
     url: `http://127.0.0.1:${port}`,
     port,
     token,
-    close: () => closeServer(),
+    get closed() { return closed; },
+    close: () => { closeServer(); },
   };
 }

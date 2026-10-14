@@ -165,8 +165,11 @@ test("server closes itself after the idle timeout", async () => {
   const server = await createSpecServer({
     root, formHtml: "", inject: async () => {}, idleTimeoutMs: 100,
   });
+  const live = await fetch(`${server.url}/api/config?token=${server.token}`);
+  assert.equal(live.status, 200);
   await new Promise((resolve) => setTimeout(resolve, 250));
   await assert.rejects(fetch(`${server.url}/api/config?token=${server.token}`));
+  assert.equal(server.closed, true);
   server.close();
   server.close();
 });
