@@ -19,6 +19,10 @@
   input[type=number] { width: 5.5ch; }
   .src { display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
   .src input { flex: 1; }
+  .chk { display: flex; align-items: center; gap: .35rem; padding: .1rem 0; }
+  .group { font-weight: 600; margin-top: .5rem; opacity: .8; }
+  .hint { font-size: .85rem; opacity: .7; }
+  .notice { color: #0a7; font-size: .9rem; margin: .4rem 0 0; }
   .err { color: #c0392b; font-size: .85rem; }
   #preview { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .8rem;
              background: #8881; border-radius: 8px; padding: .75rem; max-height: 16rem; overflow: auto; }
@@ -36,9 +40,9 @@
   <p id="status"></p>
 
   <fieldset>
-    <legend>Sources</legend>
+    <legend>Sources <button type="button" id="refreshSources">Refresh</button></legend>
     <div id="sources"></div>
-    <button type="button" id="addSource">+ Add source</button>
+    <div class="hint" id="sourcesHint"></div>
     <div class="err" data-err="sources"></div>
   </fieldset>
 
@@ -56,6 +60,7 @@
       <label><input type="radio" name="period" value="MIDTERM" /> MIDTERM</label>
       <label><input type="radio" name="period" value="FINALS" /> FINALS</label>
     </div>
+    <p class="notice" id="workbookNotice"></p>
   </fieldset>
 
   <fieldset>
@@ -90,7 +95,6 @@
     </div>
     <div class="row">
       <label class="field"><span>Output file</span><input type="text" id="output" placeholder="auto" /></label>
-      <label><input type="checkbox" id="append" checked /> append if workbook exists</label>
     </div>
     <div class="err" data-err="wordCounts"></div>
   </fieldset>
@@ -103,12 +107,6 @@
   <button id="generate">Generate</button>
   <span id="status2"></span>
 
-  <dialog id="picker">
-    <div class="row"><button type="button" id="up">..</button><span id="pickerPath"></span></div>
-    <ul id="pickerList"></ul>
-    <form method="dialog"><button>Close</button></form>
-  </dialog>
-
 <script>
 const $ = (sel) => document.querySelector(sel);
 const TYPES = [
@@ -119,30 +117,89 @@ const TYPES = [
   ["Short Answer", "c-ShortAnswer"],
 ];
 let root = "";
+let scan = { sources: [], workbooks: [] };
 
-function addSource(value = "") {
-  const wrap = document.createElement("div");
-  wrap.className = "src";
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = value;
-  input.placeholder = "path to .docx or .html";
-  input.addEventListener("input", render);
-  const browse = document.createElement("button");
-  browse.type = "button";
-  browse.textContent = "Browse…";
-  browse.addEventListener("click", () => openPicker(input));
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.textContent = "×";
-  remove.addEventListener("click", () => { wrap.remove(); render(); });
-  wrap.append(input, browse, remove);
-  $("#sources").append(wrap);
+function selectedSources() {
+  return [...document.querySelectorAll("#sources input:checked")].map((i) => i.value);
+}
+
+function renderSources() {
+  const prev = new Set(selectedSources());
+  const list = $("#sources");
+  list.innerHTML = "";
+  if (!scan.sources.length) {
+    $("#sourcesHint").textContent = root
+      ? `No .docx/.html sources found in ${root}.`
+      : "No sources found.";
+    return;
+  }
+  $("#sourcesHint").textContent = "";
+  const groups = new Map();
+  for (const s of scan.sources) {
+    const i = s.rel.lastIndexOf("/");
+    const dir = i === -1 ? "" : s.rel.slice(0, i);
+    if (!groups.has(dir)) groups.set(dir, []);
+    groups.get(dir).push(s);
+  }
+  for (const [dir, items] of groups) {
+    if (dir) {
+      const h = document.createElement("div");
+      h.className = "group";
+      h.textContent = dir;
+      list.append(h);
+    }
+    for (const s of items) {
+      const label = document.createElement("label");
+      label.className = "chk";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = s.path;
+      cb.checked = prev.has(s.path);
+      const span = document.createElement("span");
+      span.textContent = s.name;
+      label.append(cb, span);
+      list.append(label);
+    }
+  }
+}
+
+async function loadSources() {
+  $("#sourcesHint").textContent = "Scanning…";
+  let data;
+  try {
+    const res = await fetch("/api/scan");
+    if (!res.ok) throw new Error("scan failed");
+    data = await res.json();
+  } catch {
+    $("#sources").innerHTML = "";
+    $("#sourcesHint").textContent = "Could not scan the working directory.";
+    return;
+  }
+  scan = { sources: data.sources || [], workbooks: data.workbooks || [] };
+  renderSources();
+  renderWorkbookNotice();
+}
+
+function effectiveOutput() {
+  const o = $("#output").value.trim();
+  if (o) return o.toLowerCase().endsWith(".xlsx") ? o : o + ".xlsx";
+  const code = $("#subjectCode").value.trim();
+  const period = document.querySelector("input[name=period]:checked").value;
+  const name = [code, period].filter(Boolean).join("_");
+  return name ? name + ".xlsx" : "";
+}
+
+function renderWorkbookNotice() {
+  const el = $("#workbookNotice");
+  const out = effectiveOutput();
+  const base = out.replace(/\\/g, "/").split("/").pop().toLowerCase();
+  const hit = base && (scan.workbooks || []).find((w) => w.name.toLowerCase() === base);
+  el.textContent = hit ? `Found ${hit.name} — new questions will be appended.` : "";
 }
 
 function spec() {
   return {
-    sources: [...document.querySelectorAll("#sources input")].map((i) => i.value.trim()).filter(Boolean),
+    sources: selectedSources(),
     subjectCode: $("#subjectCode").value.trim(),
     description: $("#description").value.trim(),
     examPeriod: document.querySelector('input[name=period]:checked').value,
@@ -155,13 +212,14 @@ function spec() {
     },
     wordCounts: { stem: Number($("#w-stem").value) || 0, choices: Number($("#w-choices").value) || 0 },
     output: $("#output").value.trim(),
-    append: $("#append").checked,
+    append: true,
   };
 }
 
 let previewTimer = null;
 function render() {
   document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
+  renderWorkbookNotice();
   clearTimeout(previewTimer);
   previewTimer = setTimeout(updatePreview, 150);
 }
@@ -177,40 +235,6 @@ async function updatePreview() {
     $("#preview").textContent = body.prompt || "";
   } catch { /* ignore transient preview errors */ }
 }
-
-let pickerTarget = null;
-let pickerDir = "";
-function openPicker(input) {
-  pickerTarget = input;
-  pickerDir = input.value.trim() || root;
-  loadDir(pickerDir);
-  $("#picker").showModal();
-}
-async function loadDir(dir) {
-  const res = await fetch(`/api/list?dir=${encodeURIComponent(dir)}`);
-  if (!res.ok) { $("#pickerList").innerHTML = "<li>Cannot read directory.</li>"; return; }
-  const { entries } = await res.json();
-  pickerDir = dir;
-  $("#pickerPath").textContent = dir;
-  const list = $("#pickerList");
-  list.innerHTML = "";
-  for (const e of entries) {
-    const li = document.createElement("li");
-    const btn = document.createElement("button");
-    btn.className = "link";
-    btn.textContent = e.kind === "dir" ? `📁 ${e.name}` : `📄 ${e.name}`;
-    btn.addEventListener("click", () => {
-      if (e.kind === "dir") { loadDir(e.path); }
-      else { pickerTarget.value = e.path; $("#picker").close(); render(); }
-    });
-    li.append(btn);
-    list.append(li);
-  }
-}
-$("#up").addEventListener("click", () => {
-  const parent = pickerDir.replace(/[\\/][^\\/]*$/, "");
-  if (parent) loadDir(parent);
-});
 
 async function submit() {
   $("#generate").disabled = true;
@@ -244,7 +268,7 @@ async function submit() {
   $("#status").textContent = errs._ || "Please fix the highlighted fields.";
 }
 
-$("#addSource").addEventListener("click", () => { addSource(); render(); });
+$("#refreshSources").addEventListener("click", loadSources);
 document.body.addEventListener("input", render);
 document.body.addEventListener("change", render);
 $("#generate").addEventListener("click", submit);
@@ -254,7 +278,7 @@ $("#generate").addEventListener("click", submit);
     const cfg = await (await fetch("/api/config")).json();
     root = cfg.root || "";
   } catch { /* root stays empty */ }
-  addSource();
+  await loadSources();
   render();
 })();
 </script>
