@@ -48,6 +48,8 @@
       <label class="field"><span>Subject code</span><input type="text" id="subjectCode" placeholder="FM100" /></label>
       <label class="field"><span>Description</span><input type="text" id="description" placeholder="Annuities &amp; Perpetuities" /></label>
     </div>
+    <div class="err" data-err="subjectCode"></div>
+    <div class="err" data-err="description"></div>
     <div class="row">
       <span>Exam period:</span>
       <label><input type="radio" name="period" value="PRELIM" checked /> PRELIM</label>
@@ -225,11 +227,12 @@ async function submit() {
     return;
   }
   document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
-  for (const [k, v] of Object.entries(body.errors || {})) {
+  const errs = body.errors || {};
+  for (const [k, v] of Object.entries(errs)) {
     const el = document.querySelector(`[data-err="${k}"]`);
     if (el) el.textContent = v;
   }
-  $("#status").textContent = "Please fix the highlighted fields.";
+  $("#status").textContent = errs._ || "Please fix the highlighted fields.";
 }
 
 $("#addSource").addEventListener("click", () => { addSource(); render(); });
