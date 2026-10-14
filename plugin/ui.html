@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiz-Gen Spec</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.4rem; }
+  fieldset { border: 1px solid #8884; border-radius: 8px; margin: 1rem 0; padding: .75rem 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: inline-block; }
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; margin: .4rem 0; }
+  .field { display: flex; flex-direction: column; }
+  .field > span { font-size: .8rem; opacity: .75; }
+  input[type=text], input[type=number] { padding: .35rem .5rem; }
+  input[type=text] { min-width: 22ch; }
+  input[type=number] { width: 5.5ch; }
+  .src { display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
+  .src input { flex: 1; }
+  .err { color: #c0392b; font-size: .85rem; }
+  #preview { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .8rem;
+             background: #8881; border-radius: 8px; padding: .75rem; max-height: 16rem; overflow: auto; }
+  button { padding: .5rem .9rem; border-radius: 8px; cursor: pointer; }
+  #generate { font-weight: 600; }
+  #status { margin-left: .75rem; }
+  dialog { border: 1px solid #8884; border-radius: 8px; max-width: 90vw; }
+  dialog ul { list-style: none; padding: 0; max-height: 50vh; overflow: auto; }
+  dialog li { padding: .25rem .1rem; }
+  dialog button.link { background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+</style>
+</head>
+<body>
+  <h1>Quiz-Gen Spec</h1>
+  <p id="status"></p>
+
+  <fieldset>
+    <legend>Sources</legend>
+    <div id="sources"></div>
+    <button type="button" id="addSource">+ Add source</button>
+    <div class="err" data-err="sources"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Course</legend>
+    <div class="row">
+      <label class="field"><span>Subject code</span><input type="text" id="subjectCode" placeholder="FM100" /></label>
+      <label class="field"><span>Description</span><input type="text" id="description" placeholder="Annuities &amp; Perpetuities" /></label>
+    </div>
+    <div class="row">
+      <span>Exam period:</span>
+      <label><input type="radio" name="period" value="PRELIM" checked /> PRELIM</label>
+      <label><input type="radio" name="period" value="MIDTERM" /> MIDTERM</label>
+      <label><input type="radio" name="period" value="FINALS" /> FINALS</label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Questions by type</legend>
+    <div class="row">
+      <label class="field"><span>Multiple Choice</span><input type="number" id="c-MultipleChoice" value="10" min="0" /></label>
+      <label class="field"><span>True/False</span><input type="number" id="c-TrueFalse" value="0" min="0" /></label>
+      <label class="field"><span>Identification</span><input type="number" id="c-Identification" value="0" min="0" /></label>
+      <label class="field"><span>Problem Solving</span><input type="number" id="c-ProblemSolving" value="0" min="0" /></label>
+      <label class="field"><span>Short Answer</span><input type="number" id="c-ShortAnswer" value="0" min="0" /></label>
+    </div>
+    <div class="err" data-err="counts"></div>
+    <div class="row">
+      <span>Difficulty:</span>
+      <label><input type="radio" name="difficulty" value="easy" /> easy</label>
+      <label><input type="radio" name="difficulty" value="medium" checked /> medium</label>
+      <label><input type="radio" name="difficulty" value="hard" /> hard</label>
+    </div>
+    <div class="row">
+      <span>Modes:</span>
+      <label><input type="checkbox" id="m-situational" /> situational</label>
+      <label><input type="checkbox" id="m-termOnly" /> term-only</label>
+      <label><input type="checkbox" id="m-calculation" /> calculation</label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Advanced</legend>
+    <div class="row">
+      <label class="field"><span>Stem words</span><input type="number" id="w-stem" value="30" min="0" /></label>
+      <label class="field"><span>Choice/answer words</span><input type="number" id="w-choices" value="3" min="0" /></label>
+    </div>
+    <div class="row">
+      <label class="field"><span>Output file</span><input type="text" id="output" placeholder="auto" /></label>
+      <label><input type="checkbox" id="append" checked /> append if workbook exists</label>
+    </div>
+    <div class="err" data-err="wordCounts"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Preview</legend>
+    <div id="preview"></div>
+  </fieldset>
+
+  <button id="generate">Generate</button>
+  <span id="status2"></span>
+
+  <dialog id="picker">
+    <div class="row"><button type="button" id="up">..</button><span id="pickerPath"></span></div>
+    <ul id="pickerList"></ul>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const TYPES = [
+  ["Multiple Choice", "c-MultipleChoice"],
+  ["True/False", "c-TrueFalse"],
+  ["Identification", "c-Identification"],
+  ["Problem Solving", "c-ProblemSolving"],
+  ["Short Answer", "c-ShortAnswer"],
+];
+let root = "";
+
+function addSource(value = "") {
+  const wrap = document.createElement("div");
+  wrap.className = "src";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = value;
+  input.placeholder = "path to .docx or .html";
+  input.addEventListener("input", render);
+  const browse = document.createElement("button");
+  browse.type = "button";
+  browse.textContent = "Browse…";
+  browse.addEventListener("click", () => openPicker(input));
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "×";
+  remove.addEventListener("click", () => { wrap.remove(); render(); });
+  wrap.append(input, browse, remove);
+  $("#sources").append(wrap);
+}
+
+function spec() {
+  return {
+    sources: [...document.querySelectorAll("#sources input")].map((i) => i.value.trim()).filter(Boolean),
+    subjectCode: $("#subjectCode").value.trim(),
+    description: $("#description").value.trim(),
+    examPeriod: document.querySelector('input[name=period]:checked').value,
+    counts: Object.fromEntries(TYPES.map(([name, id]) => [name, Number($("#" + id).value) || 0])),
+    difficulty: document.querySelector('input[name=difficulty]:checked').value,
+    modes: {
+      situational: $("#m-situational").checked,
+      termOnly: $("#m-termOnly").checked,
+      calculation: $("#m-calculation").checked,
+    },
+    wordCounts: { stem: Number($("#w-stem").value) || 0, choices: Number($("#w-choices").value) || 0 },
+    output: $("#output").value.trim(),
+    append: $("#append").checked,
+  };
+}
+
+let previewTimer = null;
+function render() {
+  document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updatePreview, 150);
+}
+
+async function updatePreview() {
+  try {
+    const res = await fetch("/api/preview", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(spec()),
+    });
+    const body = await res.json();
+    $("#preview").textContent = body.prompt || "";
+  } catch { /* ignore transient preview errors */ }
+}
+
+let pickerTarget = null;
+let pickerDir = "";
+function openPicker(input) {
+  pickerTarget = input;
+  pickerDir = input.value.trim() || root;
+  loadDir(pickerDir);
+  $("#picker").showModal();
+}
+async function loadDir(dir) {
+  const res = await fetch(`/api/list?dir=${encodeURIComponent(dir)}`);
+  if (!res.ok) { $("#pickerList").innerHTML = "<li>Cannot read directory.</li>"; return; }
+  const { entries } = await res.json();
+  pickerDir = dir;
+  $("#pickerPath").textContent = dir;
+  const list = $("#pickerList");
+  list.innerHTML = "";
+  for (const e of entries) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.className = "link";
+    btn.textContent = e.kind === "dir" ? `📁 ${e.name}` : `📄 ${e.name}`;
+    btn.addEventListener("click", () => {
+      if (e.kind === "dir") { loadDir(e.path); }
+      else { pickerTarget.value = e.path; $("#picker").close(); render(); }
+    });
+    li.append(btn);
+    list.append(li);
+  }
+}
+$("#up").addEventListener("click", () => {
+  const parent = pickerDir.replace(/[\\/][^\\/]*$/, "");
+  if (parent) loadDir(parent);
+});
+
+async function submit() {
+  $("#status").textContent = "Sending…";
+  $("#status2").textContent = "";
+  const res = await fetch("/api/submit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(spec()),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.ok) {
+    $("#status").textContent = "Sent to OpenCode — check the TUI.";
+    $("#generate").disabled = true;
+    return;
+  }
+  document.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
+  for (const [k, v] of Object.entries(body.errors || {})) {
+    const el = document.querySelector(`[data-err="${k}"]`);
+    if (el) el.textContent = v;
+  }
+  $("#status").textContent = "Please fix the highlighted fields.";
+}
+
+$("#addSource").addEventListener("click", () => { addSource(); render(); });
+document.body.addEventListener("input", render);
+document.body.addEventListener("change", render);
+$("#generate").addEventListener("click", submit);
+
+(async () => {
+  try {
+    const cfg = await (await fetch("/api/config")).json();
+    root = cfg.root || "";
+  } catch { /* root stays empty */ }
+  addSource();
+  render();
+})();
+</script>
+</body>
+</html>
