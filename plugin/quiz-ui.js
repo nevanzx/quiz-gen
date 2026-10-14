@@ -31,9 +31,10 @@ export const QuizUiPlugin = async ({ client, directory, worktree }) => {
               inject: (spec) => injectSpec(client, spec),
             });
           }
-          const opened = openBrowser(server.url);
+          const pageUrl = `${server.url}/?token=${server.token}`;
+          const opened = openBrowser(pageUrl);
           return (
-            `Quiz-Gen spec UI ${opened ? "opened" : "available"} in the browser at ${server.url}\n` +
+            `Quiz-Gen spec UI ${opened ? "opened" : "available"} in the browser at ${pageUrl}\n` +
             "Fill in the quiz settings and click Generate — the spec will be typed into " +
             "the OpenCode prompt and the quiz pipeline will start."
           );
