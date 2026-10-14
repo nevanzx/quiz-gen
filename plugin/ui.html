@@ -35,6 +35,12 @@
 
   <fieldset>
     <legend>Sources <button type="button" id="refreshSources">Refresh</button></legend>
+    <div class="row">
+      <label class="field" style="flex:1">
+        <span>Lesson folder to scan</span>
+        <input type="text" id="scanDir" placeholder="folder path" style="min-width:100%" />
+      </label>
+    </div>
     <div id="sources"></div>
     <div class="hint" id="sourcesHint"></div>
     <div class="err" data-err="sources"></div>
@@ -159,17 +165,24 @@ function renderSources() {
 
 async function loadSources() {
   $("#sourcesHint").textContent = "Scanning…";
+  const dir = $("#scanDir").value.trim();
   let data;
   try {
-    const res = await fetch("/api/scan");
-    if (!res.ok) throw new Error("scan failed");
-    data = await res.json();
-  } catch {
+    const q = dir ? `?dir=${encodeURIComponent(dir)}` : "";
+    const res = await fetch(`/api/scan${q}`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.errors?._ || "scan failed");
+    data = body;
+  } catch (err) {
     scan = { sources: [], workbooks: [] };
     $("#sources").innerHTML = "";
-    $("#sourcesHint").textContent = "Could not scan the working directory.";
+    $("#sourcesHint").textContent = `Could not scan: ${err.message}`;
     renderWorkbookNotice();
     return;
+  }
+  if (data.root) {
+    root = data.root;
+    $("#scanDir").value = data.root;
   }
   scan = { sources: data.sources || [], workbooks: data.workbooks || [] };
   renderSources();
@@ -273,6 +286,7 @@ $("#generate").addEventListener("click", submit);
   try {
     const cfg = await (await fetch("/api/config")).json();
     root = cfg.root || "";
+    $("#scanDir").value = root;
   } catch { /* root stays empty */ }
   await loadSources();
   render();

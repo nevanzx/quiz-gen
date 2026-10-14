@@ -92,7 +92,14 @@ test("validateSpec checks word-count targets", () => {
   assert.match(validateSpec(spec, { checkFiles: false }).errors.wordCounts, /non-negative/i);
 });
 
-import { buildPrompt } from "../plugin/spec.js";
+import { buildPrompt, resolveRoot } from "../plugin/spec.js";
+
+test("resolveRoot prefers override, then session directory over worktree", () => {
+  assert.equal(resolveRoot({ override: "/a", directory: "/b", worktree: "/c", cwd: "/d" }), "/a");
+  assert.equal(resolveRoot({ directory: "/b", worktree: "/c", cwd: "/d" }), "/b");
+  assert.equal(resolveRoot({ worktree: "/c", cwd: "/d" }), "/c");
+  assert.equal(resolveRoot({ cwd: "/d" }), "/d");
+});
 
 test("buildPrompt formats every field", () => {
   const spec = normalizeSpec({

@@ -135,6 +135,37 @@ test("scan skips node_modules, .git and dot-directories", async () => {
   server.close();
 });
 
+test("scan scans a folder passed via dir", async () => {
+  const root = await makeRoot();
+  await writeFile(path.join(root, "Week 7", "lesson7.html"), "x");
+  await writeFile(path.join(root, "top.docx"), "x");
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const dir = path.join(root, "Week 7");
+  const res = await fetch(`${server.url}/api/scan?dir=${encodeURIComponent(dir)}&token=${server.token}`);
+  assert.equal(res.status, 200);
+  const { sources, root: scanned } = await res.json();
+  assert.equal(scanned, path.resolve(dir));
+  assert.deepEqual(sources.map((s) => s.rel), ["lesson7.html"]);
+  server.close();
+});
+
+test("scan rejects a missing dir with 400", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const missing = path.join(root, "nope");
+  const res = await fetch(`${server.url}/api/scan?dir=${encodeURIComponent(missing)}&token=${server.token}`);
+  assert.equal(res.status, 400);
+  server.close();
+});
+
+test("scan with dir still requires the token", async () => {
+  const root = await makeRoot();
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const res = await fetch(`${server.url}/api/scan?dir=${encodeURIComponent(root)}`);
+  assert.equal(res.status, 403);
+  server.close();
+});
+
 test("scan requires the token", async () => {
   const root = await makeRoot();
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });

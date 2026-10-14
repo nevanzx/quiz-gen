@@ -108,6 +108,10 @@ export function validateSpec(spec, { checkFiles = true } = {}) {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
+export function resolveRoot({ override, directory, worktree, cwd } = {}) {
+  return override || directory || worktree || cwd || process.cwd();
+}
+
 export function buildPrompt(spec) {
   const counts = TYPES.map((t) => `${t} ${spec.counts[t]}`).join(", ");
   const modes = MODE_KEYS

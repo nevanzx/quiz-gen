@@ -30,6 +30,8 @@ the spec is then typed into the OpenCode prompt and arrives as the next message 
 that message as the confirmed spec and proceed with the workflow below. The form
 scans the working directory for `.docx`/`.html` lesson sources and lists them as a
 checklist, and it shows a notice when an existing quiz workbook will be appended to.
+If the lesson files live outside the working directory, pass `directory` (an absolute
+path) when calling `quiz_ui`; the user can also edit the folder in the form.
 
 If the incoming user message already begins with `Generate a quiz using the quiz-gen skill with these settings:`, the spec has already been collected — skip the UI and proceed with the workflow below.
 

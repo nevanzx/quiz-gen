@@ -156,12 +156,15 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
 
       if (req.method === "GET" && url.pathname === "/api/scan") {
         if (!authed) return send(res, 403, { error: "forbidden" });
+        const requested = url.searchParams.get("dir");
+        const target = requested ? path.resolve(requested) : path.resolve(root);
         try {
-          await readdir(root);
+          const st = await stat(target);
+          if (!st.isDirectory()) throw new Error("not a directory");
         } catch {
-          return send(res, 400, { errors: { _: "Cannot read the working directory." } });
+          return send(res, 400, { errors: { _: `Cannot read folder: ${target}` } });
         }
-        return send(res, 200, await scanSources(root));
+        return send(res, 200, { ...(await scanSources(target)), root: target });
       }
 
       if (req.method === "POST" && url.pathname === "/api/preview") {
