@@ -27,7 +27,9 @@ If the `quiz_ui` tool is available, call it **first**, before anything else. It 
 browser form that collects every input below (source, subject, exam period, counts,
 difficulty, modes, word-count targets, output). The user fills it in and clicks Generate;
 the spec is then typed into the OpenCode prompt and arrives as the next message — treat
-that message as the confirmed spec and proceed with the workflow below.
+that message as the confirmed spec and proceed with the workflow below. The form
+scans the working directory for `.docx`/`.html` lesson sources and lists them as a
+checklist, and it shows a notice when an existing quiz workbook will be appended to.
 
 If the incoming user message already begins with `Generate a quiz using the quiz-gen skill with these settings:`, the spec has already been collected — skip the UI and proceed with the workflow below.
 

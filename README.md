@@ -39,7 +39,10 @@ powershell -File scripts/install-plugin.ps1
 
 Then restart OpenCode. That's the whole setup — when the quiz-gen skill is used it opens
 the spec form at `http://127.0.0.1:<random-port>`; you choose the parameters and click
-Generate, and the spec is typed into the OpenCode prompt to run the pipeline. The server
+Generate, and the spec is typed into the OpenCode prompt to run the pipeline. The
+form scans your project for `.docx`/`.html` lesson sources and shows them as a
+checklist, and it flags an existing `FM100_PRELIM.xlsx` so you know new questions
+will be appended. The server
 is loopback-only and token-guarded.
 
 <details>
