@@ -107,3 +107,23 @@ export function validateSpec(spec, { checkFiles = true } = {}) {
 
   return { valid: Object.keys(errors).length === 0, errors };
 }
+
+export function buildPrompt(spec) {
+  const counts = TYPES.map((t) => `${t} ${spec.counts[t]}`).join(", ");
+  const modes = MODE_KEYS
+    .map((k) => `${k === "termOnly" ? "term-only" : k} ${spec.modes[k] ? "on" : "off"}`)
+    .join(", ");
+  return [
+    "Generate a quiz using the quiz-gen skill with these settings:",
+    `- Sources: ${spec.sources.join(", ")}`,
+    `- Subject code: ${spec.subjectCode}`,
+    `- Description: ${spec.description}`,
+    `- Exam period: ${spec.examPeriod}`,
+    `- Counts: ${counts}`,
+    `- Difficulty: ${spec.difficulty}`,
+    `- Modes: ${modes}`,
+    `- Word-count targets: stem ~${spec.wordCounts.stem}, choices/answer ~${spec.wordCounts.choices}`,
+    `- Output: ${spec.output}${spec.append ? " (append if the workbook already has questions)" : " (overwrite)"}`,
+    "Run the full pipeline: extract the source, generate (Pass 1), verify (Pass 2), export.",
+  ].join("\n");
+}

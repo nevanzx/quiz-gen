@@ -91,3 +91,31 @@ test("validateSpec checks word-count targets", () => {
   spec.wordCounts = { stem: -1, choices: 3 };
   assert.match(validateSpec(spec, { checkFiles: false }).errors.wordCounts, /non-negative/i);
 });
+
+import { buildPrompt } from "../plugin/spec.js";
+
+test("buildPrompt formats every field", () => {
+  const spec = normalizeSpec({
+    sources: ["FM100/Week7.html", "FM100/Week8.html"],
+    subjectCode: "FM100",
+    description: "Annuities & Perpetuities",
+    examPeriod: "MIDTERM",
+    counts: { "Multiple Choice": 10, "True/False": 5 },
+    difficulty: "hard",
+    modes: { termOnly: true },
+    wordCounts: { stem: 40, choices: 3 },
+    output: "FM100_MIDTERM.xlsx",
+    append: false,
+  });
+  const text = buildPrompt(spec);
+  assert.match(text, /^Generate a quiz using the quiz-gen skill/);
+  assert.match(text, /- Sources: FM100\/Week7\.html, FM100\/Week8\.html/);
+  assert.match(text, /- Subject code: FM100/);
+  assert.match(text, /- Exam period: MIDTERM/);
+  assert.match(text, /Multiple Choice 10, True\/False 5, Identification 0, Problem Solving 0, Short Answer 0/);
+  assert.match(text, /- Difficulty: hard/);
+  assert.match(text, /Modes: situational off, term-only on, calculation off/);
+  assert.match(text, /Word-count targets: stem ~40, choices\/answer ~3/);
+  assert.match(text, /- Output: FM100_MIDTERM\.xlsx \(overwrite\)/);
+  assert.match(text, /extract the source, generate \(Pass 1\), verify \(Pass 2\), export\.$/);
+});
