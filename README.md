@@ -27,42 +27,40 @@ pip install -r requirements.txt   # python-docx, beautifulsoup4, openpyxl
 pip install pywin32
 ```
 
-### Wire into OpenCode
+### Wire into OpenCode (one command)
 
-Add the repo path to `skills.paths` in `~/.config/opencode/opencode.json`:
-
-```json
-{ "skills": { "paths": ["D:/Python/quiz-gen"] } }
-```
-
-…and/or link it into your skills directory:
-
-```bash
-# macOS/Linux
-ln -s /path/to/quiz-gen ~/.claude/skills/quiz-gen
-# Windows (PowerShell, as admin or with developer mode)
-New-Item -ItemType Junction -Path "$HOME\.claude\skills\quiz-gen" -Target "D:\Python\quiz-gen"
-```
-
-### Optional: spec UI plugin
-
-The quiz-gen companion plugin adds a browser form for collecting quiz specs. It opens
-automatically whenever the skill runs.
+`scripts/install-plugin.ps1` installs **both halves of the package** in one step: the
+companion plugin (the `quiz_ui` tool + browser spec form) and the skill-path
+registration.
 
 ```powershell
 powershell -File scripts/install-plugin.ps1
+```
+
+Then restart OpenCode. That's the whole setup — when the quiz-gen skill is used it opens
+the spec form at `http://127.0.0.1:<random-port>`; you choose the parameters and click
+Generate, and the spec is typed into the OpenCode prompt to run the pipeline. The server
+is loopback-only and token-guarded.
+
+<details>
+<summary>Manual wiring (alternative)</summary>
+
+```json
+{ "skills": { "paths": ["D:/Programming/quiz-gen"] } }
+```
+
+```powershell
+Copy-Item -Path plugin\* -Destination "$HOME\.config\opencode\plugins\" -Recurse -Force
 # macOS/Linux: cp plugin/* ~/.config/opencode/plugins/
 ```
 
-Restart OpenCode after installing. The plugin registers a `quiz_ui` tool; when the skill
-is used, the agent calls it, the form opens at `http://127.0.0.1:<random-port>`, and on
-submit the spec is typed into the OpenCode prompt to start the pipeline. The server is
-loopback-only and token-guarded.
+</details>
 
 ## Use
 
 Once installed, just ask in OpenCode, e.g. *"Generate a Week 7 exam quiz from
-this lesson notebook"*. The skill asks for the settings, then runs the pipeline.
+this lesson notebook"*. The spec form opens for you to pick the settings; on Generate
+the spec is typed into the prompt and the pipeline runs.
 Under the hood:
 
 ```bash
