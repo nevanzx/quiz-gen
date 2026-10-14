@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createSpecServer } from "../plugin/server.js";
@@ -125,5 +125,33 @@ test("list requires the token", async () => {
   const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
   const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(root)}`);
   assert.equal(res.status, 403);
+  server.close();
+});
+
+test("list rejects a symlink that escapes the root", async (t) => {
+  const root = await makeRoot();
+  const outside = await mkdtemp(path.join(tmpdir(), "quizui-outside-"));
+  await writeFile(path.join(outside, "secret.docx"), "x");
+  const link = path.join(root, "escape");
+  try {
+    await symlink(outside, link, process.platform === "win32" ? "junction" : "dir");
+  } catch {
+    t.skip("symlinks unavailable on this filesystem");
+    return;
+  }
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const res = await fetch(`${server.url}/api/list?dir=${encodeURIComponent(link)}&token=${server.token}`);
+  assert.equal(res.status, 403);
+  server.close();
+});
+
+test("list allows a child whose name begins with dots", async () => {
+  const root = await makeRoot();
+  await mkdir(path.join(root, "..foo"));
+  const server = await createSpecServer({ root, formHtml: "", inject: async () => {} });
+  const res = await fetch(
+    `${server.url}/api/list?dir=${encodeURIComponent(path.join(root, "..foo"))}&token=${server.token}`
+  );
+  assert.equal(res.status, 200);
   server.close();
 });

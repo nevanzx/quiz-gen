@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomBytes } from "node:crypto";
-import { readdir } from "node:fs/promises";
+import { readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { normalizeSpec, validateSpec, buildPrompt } from "./spec.js";
 
@@ -33,11 +33,21 @@ function readBody(req) {
   });
 }
 
-function resolveWithinRoot(root, dir) {
+async function resolveWithinRoot(root, dir) {
   const resolvedRoot = path.resolve(root);
   const target = path.resolve(dir || resolvedRoot);
   const rel = path.relative(resolvedRoot, target);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  if (rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) return null;
+  try {
+    const realRoot = await realpath(resolvedRoot);
+    const realTarget = await realpath(target);
+    const realRel = path.relative(realRoot, realTarget);
+    if (realRel === ".." || realRel.startsWith(".." + path.sep) || path.isAbsolute(realRel)) {
+      return null;
+    }
+  } catch {
+    // target does not exist; allow it so readdir produces the 400 response
+  }
   return target;
 }
 
@@ -66,7 +76,7 @@ export async function createSpecServer({ root, formHtml, inject, checkFiles = tr
 
       if (req.method === "GET" && url.pathname === "/api/list") {
         if (!authed) return send(res, 403, { error: "forbidden" });
-        const target = resolveWithinRoot(root, url.searchParams.get("dir"));
+        const target = await resolveWithinRoot(root, url.searchParams.get("dir"));
         if (!target) return send(res, 403, { error: "forbidden" });
         let dirents;
         try {
