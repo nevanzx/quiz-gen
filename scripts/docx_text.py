@@ -36,7 +36,8 @@ def iter_blocks(doc):
 
 
 def is_heading(p):
-    style = (p.style.name or "").lower()
+    style_el = p.style
+    style = ((style_el.name if style_el is not None else "") or "").lower()
     return style.startswith("heading") or style in ("title", "subtitle")
 
 
